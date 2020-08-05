@@ -30,6 +30,8 @@ import com.google.j2objc.annotations.RetainedWith;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symbol.ClassSymbol;
+
+import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Collections;
@@ -848,5 +850,21 @@ public final class ElementUtil {
       }
     }
     return null;
+  }
+
+  public static boolean isKotlinType(Element node) {
+    if (ElementUtil.getDeclaringClass(node) == null) {
+      return false;
+    }
+    return ElementUtil.getSourceFile(ElementUtil.getDeclaringClass(node)).endsWith(".kt");
+  }
+
+  public static boolean isKotlinType(TypeElement node) {
+    for (Element elem : node.getEnclosedElements()) {
+     if(isKotlinType(elem)) {
+       return true;
+     }
+    }
+    return false;
   }
 }

@@ -246,6 +246,11 @@ public class Functionizer extends UnitTreeVisitor {
   @Override
   public void endVisit(MethodInvocation node) {
     ExecutableElement method = node.getExecutableElement();
+
+    if (ElementUtil.isKotlinType(method)) {
+      return;
+    }
+
     if (ElementUtil.isStatic(method) || ElementUtil.isPrivate(method)
         || (functionizableMethods.contains(method) && ElementUtil.isFinal(method))) {
       functionizeInvocation(node, method, node.getExpression(), node.getArguments());

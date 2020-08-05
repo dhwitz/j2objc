@@ -85,6 +85,9 @@ public class ObjectiveCImplementationGenerator extends ObjectiveCSourceFileGener
     includeFiles.add(getGenerationUnit().getOutputPath() + ".h");
     for (GeneratedType generatedType : getOrderedTypes()) {
       for (Import imp : generatedType.getImplementationIncludes()) {
+//        System.out.println(imp.getImportFileName());
+//        System.out.println(imp.getJavaQualifiedName());
+//        System.out.println();
         if (!isLocalType(imp.getTypeName())) {
           includeFiles.add(imp.getImportFileName());
         }

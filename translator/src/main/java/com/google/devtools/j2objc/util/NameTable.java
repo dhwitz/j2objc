@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.devtools.j2objc.J2ObjC;
 import com.google.devtools.j2objc.Options;
+import com.google.devtools.j2objc.ast.Type;
 import com.google.devtools.j2objc.types.NativeType;
 import com.google.devtools.j2objc.types.PointerType;
 import com.google.j2objc.annotations.ObjectiveCName;
@@ -41,11 +42,7 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
-import javax.lang.model.element.AnnotationMirror;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.PackageElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.TypeMirror;
 
@@ -369,6 +366,16 @@ public class NameTable {
     return false;
   }
 
+  private boolean appendParamKeywordKotlin(
+          StringBuilder sb, Name paramName, char delim, boolean first) {
+    String keyword = paramName.toString();
+    if (first) {
+      keyword = capitalize(keyword);
+    }
+    sb.append(keyword).append(delim);
+    return false;
+  }
+
   private String addParamNames(ExecutableElement method, String name, char delim) {
     StringBuilder sb = new StringBuilder(name);
     boolean first = true;
@@ -379,7 +386,11 @@ public class NameTable {
       }
     }
     for (VariableElement param : method.getParameters()) {
-      first = appendParamKeyword(sb, param.asType(), delim, first);
+      if(ElementUtil.isKotlinType(method)) {
+        first = appendParamKeywordKotlin(sb, param.getSimpleName(), delim, first);
+      } else {
+        first = appendParamKeyword(sb, param.asType(), delim, first);
+      }
     }
     if (ElementUtil.isConstructor(method)) {
       for (VariableElement param : captureInfo.getImplicitPostfixParams(declaringClass)) {
@@ -650,6 +661,10 @@ public class NameTable {
       return mappedName;
     }
 
+    if(ElementUtil.isKotlinType(element)) {
+      return getPrefixKotlin(ElementUtil.getPackage(element)) + getTypeSubName(element);
+    }
+
     // Use camel-cased package+class name.
     return getPrefix(ElementUtil.getPackage(element)) + getTypeSubName(element);
   }
@@ -675,6 +690,20 @@ public class NameTable {
 
   private String getPrefix(PackageElement packageElement) {
     return prefixMap.getPrefix(packageElement);
+  }
+
+  private String getPrefixKotlin(PackageElement packageElement) {
+    String prefix = prefixMap.getPrefix(packageElement);
+    StringBuilder kotlinPrefix = new StringBuilder();
+
+    for(int i = 0; i < prefix.length(); i++) {
+      char current = prefix.charAt(i);
+      if(Character.isUpperCase(current)) {
+        kotlinPrefix.append(current);
+      }
+    }
+
+    return kotlinPrefix.toString();
   }
 
   /** Ignores the ObjectiveCName annotation. */
