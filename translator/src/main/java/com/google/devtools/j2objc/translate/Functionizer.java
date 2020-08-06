@@ -14,44 +14,15 @@
 
 package com.google.devtools.j2objc.translate;
 
-import com.google.devtools.j2objc.ast.AbstractTypeDeclaration;
-import com.google.devtools.j2objc.ast.AnnotationTypeDeclaration;
-import com.google.devtools.j2objc.ast.Block;
-import com.google.devtools.j2objc.ast.BodyDeclaration;
-import com.google.devtools.j2objc.ast.ClassInstanceCreation;
-import com.google.devtools.j2objc.ast.CompilationUnit;
-import com.google.devtools.j2objc.ast.ConstructorInvocation;
-import com.google.devtools.j2objc.ast.Expression;
-import com.google.devtools.j2objc.ast.ExpressionStatement;
-import com.google.devtools.j2objc.ast.FieldAccess;
-import com.google.devtools.j2objc.ast.FunctionDeclaration;
-import com.google.devtools.j2objc.ast.FunctionInvocation;
-import com.google.devtools.j2objc.ast.MethodDeclaration;
-import com.google.devtools.j2objc.ast.MethodInvocation;
-import com.google.devtools.j2objc.ast.NativeStatement;
-import com.google.devtools.j2objc.ast.NormalAnnotation;
-import com.google.devtools.j2objc.ast.QualifiedName;
-import com.google.devtools.j2objc.ast.ReturnStatement;
-import com.google.devtools.j2objc.ast.SimpleName;
-import com.google.devtools.j2objc.ast.SingleMemberAnnotation;
-import com.google.devtools.j2objc.ast.SingleVariableDeclaration;
-import com.google.devtools.j2objc.ast.Statement;
-import com.google.devtools.j2objc.ast.SuperConstructorInvocation;
-import com.google.devtools.j2objc.ast.SuperFieldAccess;
-import com.google.devtools.j2objc.ast.SuperMethodInvocation;
-import com.google.devtools.j2objc.ast.ThisExpression;
-import com.google.devtools.j2objc.ast.TreeUtil;
-import com.google.devtools.j2objc.ast.TreeVisitor;
-import com.google.devtools.j2objc.ast.TypeDeclaration;
-import com.google.devtools.j2objc.ast.UnitTreeVisitor;
-import com.google.devtools.j2objc.types.FunctionElement;
-import com.google.devtools.j2objc.types.GeneratedExecutableElement;
-import com.google.devtools.j2objc.types.GeneratedVariableElement;
+import com.google.devtools.j2objc.ast.*;
+import com.google.devtools.j2objc.types.*;
 import com.google.devtools.j2objc.util.CaptureInfo;
 import com.google.devtools.j2objc.util.ElementUtil;
 import com.google.devtools.j2objc.util.NameTable;
 import com.google.devtools.j2objc.util.TypeUtil;
 import com.google.devtools.j2objc.util.UnicodeUtils;
+
+import java.lang.reflect.Executable;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -59,6 +30,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
@@ -316,6 +288,29 @@ public class Functionizer extends UnitTreeVisitor {
   public void endVisit(ClassInstanceCreation node) {
     ExecutableElement element = node.getExecutableElement();
     TypeElement type = ElementUtil.getDeclaringClass(element);
+
+    if(ElementUtil.isKotlinType(element)) {
+      String fullName = nameTable.getFullFunctionName(element);
+      fullName = fullName.substring(0, fullName.indexOf("_"));
+
+      GeneratedExecutableElement classElement = GeneratedExecutableElement
+              .newMethodWithSelector(fullName, node.getTypeMirror(), ElementUtil.getDeclaringClass(element));
+
+      GeneratedExecutableElement allocElement = GeneratedExecutableElement
+              .newMethodWithSelector("alloc", node.getExecutableType().getReturnType(),
+                      ElementUtil.getDeclaringClass(element));
+      ExecutablePair allocPair = new ExecutablePair(allocElement, node.getExecutableType());
+
+      MethodInvocation allocMethod = new MethodInvocation(allocPair, new SimpleName(classElement));
+
+      MethodInvocation initMethod = new MethodInvocation(node.getExecutablePair(), allocMethod);
+      TreeUtil.moveList(node.getCaptureArgs(), initMethod.getArguments());
+      TreeUtil.moveList(node.getArguments(), initMethod.getArguments());
+
+      node.replaceWith(initMethod);
+      return;
+    }
+
     FunctionElement funcElement = newAllocatingConstructorElement(element);
     FunctionInvocation invocation = new FunctionInvocation(funcElement, node.getTypeMirror());
     invocation.setHasRetainedResult(node.hasRetainedResult() || options.useARC());

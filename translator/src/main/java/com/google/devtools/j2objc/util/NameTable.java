@@ -27,6 +27,8 @@ import com.google.devtools.j2objc.ast.Type;
 import com.google.devtools.j2objc.types.NativeType;
 import com.google.devtools.j2objc.types.PointerType;
 import com.google.j2objc.annotations.ObjectiveCName;
+import com.sun.tools.javac.main.Option;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -376,6 +378,15 @@ public class NameTable {
     return false;
   }
 
+  private Optional<String> checkEnclosedElementsForField(List<? extends Element> elements, String fieldName) {
+    for(Element x : elements) {
+      if (x.getSimpleName().toString().compareToIgnoreCase(fieldName) == 0) {
+        return Optional.of(x.getSimpleName().toString());
+      }
+    }
+    return Optional.empty();
+  }
+
   private String addParamNames(ExecutableElement method, String name, char delim) {
     StringBuilder sb = new StringBuilder(name);
     boolean first = true;
@@ -387,6 +398,16 @@ public class NameTable {
     }
     for (VariableElement param : method.getParameters()) {
       if(ElementUtil.isKotlinType(method)) {
+
+        if(first && method.getSimpleName().toString().equals("<init>")) {
+          sb.append("With");
+        }
+
+        if(name.startsWith("set") &&
+                checkEnclosedElementsForField(declaringClass.getEnclosedElements(), name.substring(3)).isPresent()) {
+          break;
+        }
+
         first = appendParamKeywordKotlin(sb, param.getSimpleName(), delim, first);
       } else {
         first = appendParamKeyword(sb, param.asType(), delim, first);
@@ -403,6 +424,16 @@ public class NameTable {
   public String getMethodSelector(ExecutableElement method) {
     String selector = methodSelectorCache.get(method);
     if (selector != null) {
+      if(selector.startsWith("get") && ElementUtil.isKotlinType(method)) {
+        Optional<String> getterName =
+                checkEnclosedElementsForField(ElementUtil.getDeclaringClass(method).getEnclosedElements(),
+                        selector.substring(3));
+        if(getterName.isPresent()) {
+          return getterName.get();
+        }
+
+      }
+
       return selector;
     }
     selector = getMethodSelectorInner(method);
