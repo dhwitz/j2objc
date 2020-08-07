@@ -856,10 +856,19 @@ public final class ElementUtil {
    * Determines if an element is a Kotlin type by looking at the source file embedded in the class file.
    */
   public static boolean isKotlinType(Element node) {
-    if (ElementUtil.getDeclaringClass(node) == null) {
+    TypeElement decClass = ElementUtil.getDeclaringClass(node);
+
+    if (decClass == null) {
       return false;
     }
-    return ElementUtil.getSourceFile(ElementUtil.getDeclaringClass(node)).endsWith(".kt");
+
+    String sourceName = ElementUtil.getSourceFile(decClass);
+
+    if (sourceName == null) {
+      return false;
+    }
+
+    return sourceName.endsWith(".kt");
   }
 
   /**
